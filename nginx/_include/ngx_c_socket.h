@@ -153,8 +153,8 @@ private:
 	void initconnection();								// 初始化连接池
 	void clearconnection();								// 回收连接池
 	lpngx_connection_t ngx_get_connection(int isock);	// 从连接池中获取一个空闲连接
-	void ngx_free_connection(lpngx_connection_t pConn); // 归还参数pConn所代表的连接到到连接池中
-	void inRecyConnectQueue(lpngx_connection_t pConn);	// 将要回收的连接放到一个队列中来
+	void ngx_free_connection(lpngx_connection_t pConn); // 归还参数pConn所代表的连接到到连接池中，用于将连接对象放回空闲队列，重置状态但不关闭 socket。
+	void inRecyConnectQueue(lpngx_connection_t pConn);	// 延迟回收连接，将要回收的连接放到一个队列中来，用于处理那些可能需要延迟清理或特别管理的连接，通常在连接预计不再被使用时调用。
 
 	// 和时间相关的函数
 	void AddToTimerQueue(lpngx_connection_t pConn);		  // 设置踢出时钟(向map表中增加内容)
@@ -182,6 +182,7 @@ protected:
 	int m_iWaitTime;	 // 多少秒检测一次是否 心跳超时，只有当Sock_WaitTimeEnable = 1时，本项才有用
 
 private:
+	// ThreadItem 结构体允许将线程相关的信息集中管理，提供了一种结构化的方式来跟踪和控制每个线程的行为和状态。通过这种方式，可以方便地进行线程的创建、启动、监控和停止。
 	struct ThreadItem
 	{
 		pthread_t _Handle; // 线程句柄

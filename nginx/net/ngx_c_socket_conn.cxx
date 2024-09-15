@@ -84,7 +84,7 @@ void CSocekt::initconnection()
     {
         p_Conn = (lpngx_connection_t)p_memory->AllocMemory(ilenconnpool, true); // 清理内存 , 因为这里分配内存new char，无法执行构造函数，所以如下：
         // 手工调用构造函数，因为AllocMemory里无法调用构造函数
-        p_Conn = new (p_Conn) ngx_connection_t(); // 定位new【不懂请百度】，释放则显式调用p_Conn->~ngx_connection_t();
+        p_Conn = new (p_Conn) ngx_connection_t(); // 定位new【用于在由 AllocMemory 提供的内存地址上直接构造 ngx_connection_t 对象。定位 new 允许在特定的内存地址上调用构造函数，这对于在预分配的内存池中构造对象非常有用】，释放则显式调用p_Conn->~ngx_connection_t();
         p_Conn->GetOneToUse();
         m_connectionList.push_back(p_Conn);     // 所有链接【不管是否空闲】都放在这个list
         m_freeconnectionList.push_back(p_Conn); // 空闲连接会放在这个list
@@ -103,8 +103,8 @@ void CSocekt::clearconnection()
     {
         p_Conn = m_connectionList.front();
         m_connectionList.pop_front();
-        p_Conn->~ngx_connection_t(); // 手工调用析构函数
-        p_memory->FreeMemory(p_Conn);
+        p_Conn->~ngx_connection_t();  // 手工调用析构函数，由于连接对象是使用定位 new 在预先分配的内存中构造的，必须显式调用析构函数来正确清理对象的内部状态和资源
+        p_memory->FreeMemory(p_Conn); // 释放连接对象所占用的内存。此步骤确保分配的内存得到正确释放，防止内存泄漏。
     }
 }
 
@@ -156,7 +156,7 @@ void CSocekt::ngx_free_connection(lpngx_connection_t pConn)
 
 // 将要回收的连接放到一个队列中来，后续有专门的线程会处理这个队列中的连接的回收
 // 有些连接，我们不希望马上释放，要隔一段时间后再释放以确保服务器的稳定，所以，我们把这种隔一段时间才释放的连接先放到一个队列中来
-void CSocekt::inRecyConnectQueue(lpngx_connection_t pConn)
+void CSocekt::inRecyConnectQueue(lpngx_connection_t pConn) // 函数的主要任务是将一个连接对象 pConn 放入回收队列中。
 {
     // ngx_log_stderr(0,"哎呀我去");
 
@@ -221,7 +221,7 @@ void *CSocekt::ServerRecyConnectionThread(void *threadData)
             {
                 p_Conn = (*pos);
                 if (
-                    ((p_Conn->inRecyTime + pSocketObj->m_RecyConnectionWaitTime) > currtime) && (g_stopEvent == 0) // 如果不是要整个系统退出，你可以continue，否则就得要强制释放
+                    ((p_Conn->inRecyTime + pSocketObj->m_RecyConnectionWaitTime) > currtime) && (g_stopEvent == 0) // 如果不是要整个系统退出，(连接进入回收队列的时间 + 等待时间 > 当前时间，说明还没有到达释放时间)你可以continue，否则就得要强制释放
                 )
                 {
                     continue; // 没到释放的时间
